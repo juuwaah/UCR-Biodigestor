@@ -12,7 +12,7 @@ latest = {
     "updated_at": None,
 }
 
-JST = timezone(timedelta(hours=9))
+UTC = timezone.utc
 
 # ESP32 posts data here
 @app.route("/api/data", methods=["POST"])
@@ -24,7 +24,7 @@ def receive_data():
     latest["water_temp"] = data.get("water_temp")
     latest["heater"] = data.get("heater")
     latest["motor"] = data.get("motor")
-    latest["updated_at"] = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+    latest["updated_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     return jsonify({"status": "ok"})
 
 
@@ -189,22 +189,22 @@ PAGE = """
 <body>
 <div class="page">
     <div class="titlebar">
-        <span>Biodigester Monitor v2</span>
+        <span>UCR-IDS</span>
         <div class="titlebar-buttons">
             <span>_</span><span>&square;</span><span>&times;</span>
         </div>
     </div>
     <div class="panel">
-        <h1>Biodigester Monitor</h1>
+        <h1>Monitor de Biogestor v2</h1>
         <hr>
         <div class="readings">
             <div class="reading-box">
-                <div class="reading-label">Biodigester Temp</div>
+                <div class="reading-label">Temp de Biogestor</div>
                 <div class="reading-value" id="bio">--</div>
                 <div class="reading-unit">&deg;C</div>
             </div>
             <div class="reading-box">
-                <div class="reading-label">Water Tank Temp</div>
+                <div class="reading-label">Temp del tanque</div>
                 <div class="reading-value" id="water">--</div>
                 <div class="reading-unit">&deg;C</div>
             </div>
@@ -212,13 +212,13 @@ PAGE = """
         <div class="panel-inset">
             <div class="readings" style="margin:0">
                 <div>
-                    <div class="reading-label">Heater</div>
+                    <div class="reading-label">Calentador</div>
                     <div class="status-line">
                         <span class="status-badge status-unknown" id="heater">--</span>
                     </div>
                 </div>
                 <div>
-                    <div class="reading-label">Motor</div>
+                    <div class="reading-label">Bomba/ motor</div>
                     <div class="status-line">
                         <span class="status-badge status-unknown" id="motor">--</span>
                     </div>
@@ -226,16 +226,13 @@ PAGE = """
             </div>
         </div>
         <hr>
-        <div class="updated">Last update: <span id="time">--</span></div>
+        <div class="updated">Ultima actualizacion: <span id="time">--</span></div>
         <div class="connection" id="status"></div>
     </div>
-    <div class="footer">Biodigester Automation - UCR. 2026</div>
-    <div class="counter">Visitor No. <span id="visitor">???</span></div>
+    <div class="footer">Automatizacion por Bakuho Goto - UCR-IDS. 2026</div>
 </div>
 
 <script>
-document.getElementById("visitor").textContent = String(Math.floor(Math.random() * 9000) + 1000);
-
 async function refresh() {
     try {
         const res = await fetch("/api/data");
@@ -261,10 +258,20 @@ async function refresh() {
             motorEl.className = "status-badge status-unknown";
         }
 
-        document.getElementById("time").textContent = d.updated_at || "--";
-        document.getElementById("status").innerHTML = '<span class="live">&#9679; LIVE</span>';
+        // Convert to Costa Rica time (UTC-6)
+        if (d.updated_at) {
+            const utcDate = new Date(d.updated_at + " UTC");
+            const crDate = new Date(utcDate.getTime() - 6 * 60 * 60 * 1000);
+            const h = String(crDate.getUTCHours()).padStart(2, "0");
+            const m = String(crDate.getUTCMinutes()).padStart(2, "0");
+            const s = String(crDate.getUTCSeconds()).padStart(2, "0");
+            document.getElementById("time").textContent = h + ":" + m + ":" + s + " (Costa Rica)";
+        } else {
+            document.getElementById("time").textContent = "--";
+        }
+        document.getElementById("status").innerHTML = '<span class="live">&#9679; EN VIVO</span>';
     } catch (e) {
-        document.getElementById("status").innerHTML = '<span class="error">&#9679; CONNECTION ERROR</span>';
+        document.getElementById("status").innerHTML = '<span class="error">&#9679; ERROR DE CONEXION</span>';
     }
 }
 refresh();

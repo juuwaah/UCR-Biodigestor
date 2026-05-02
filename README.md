@@ -78,13 +78,14 @@ ESP32 3.3V ──┬────────────────────
              │
              └─── [4.7kΩ] ───┐
                               │
-ESP32 GPIO4 ─┬───────────────┘
-             ├──────────────────── DS18B20 #1 White (DATA)
-             └──────────────────── DS18B20 #2 White (DATA)
+ESP32 GPIO4 ──────────────────┼── DS18B20 #1 White (DATA)
+                              └── DS18B20 #2 White (DATA)
 
 ESP32 GND ───┬──────────────────── DS18B20 #1 Black (GND)
              └──────────────────── DS18B20 #2 Black (GND)
 ```
+
+The 4.7kΩ resistor connects from 3.3V to the DATA line. GPIO4 and the sensor DATA wires meet at the same node — the resistor only pulls the bus HIGH, it does not sit between GPIO4 and the sensors.
 
 Each DS18B20 has a unique 64-bit ROM address. Run `scanDS18B20Addresses()` on first boot to discover addresses, then configure them in `biogester.cpp`.
 
@@ -137,7 +138,7 @@ ESP32 VIN (5V) ───────────┬──── LCD VCC (power)
 
                         +3.3V
 ESP32 3.3V ───────────────┬──── DS18B20 VCC (Red, both sensors)
-                          ├──── 4.7kΩ pull-up to GPIO4 (DATA)
+                          └──── [4.7kΩ] ──→ DATA line (GPIO4)
                           └──── Level Shifter (LV)
 
                         GND Rail

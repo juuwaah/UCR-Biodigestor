@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <OneWire.h>
@@ -241,8 +242,10 @@ void loop() {
 
   // Send data to Railway server
   if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    client.setInsecure();  // skip certificate verification
     HTTPClient http;
-    http.begin(serverURL);
+    http.begin(client, serverURL);
     http.addHeader("Content-Type", "application/json");
     String json = "{";
     json += "\"biodigester_temp\":" + String(bioTemp, 1) + ",";

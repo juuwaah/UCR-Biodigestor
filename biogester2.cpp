@@ -37,7 +37,7 @@ LiquidCrystal_I2C lcd(LCD_ADDR, 20, 4);
 
 // ===== Railway Server =====
 // TODO: Replace with your Railway deployment URL
-const char* serverURL = "https://YOUR_APP.up.railway.app/api/data";
+const char* serverURL = "https://ucr-biogestor-production.up.railway.app/";
 
 // ===== Temperature Thresholds (Hysteresis Control) =====
 const float TEMP_ON  = 37.0;  // Heater + Motor ON below this

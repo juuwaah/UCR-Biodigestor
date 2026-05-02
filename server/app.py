@@ -48,69 +48,224 @@ PAGE = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Biodigester Monitor</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Helvetica Neue', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  h1 { font-size: 1.4rem; margin-bottom: 24px; color: #8899aa; font-weight: 400; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 420px; width: 90%; }
-  .card { background: #1a1d27; border-radius: 12px; padding: 20px; text-align: center; }
-  .label { font-size: 0.75rem; color: #667; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-  .value { font-size: 2.2rem; font-weight: 700; }
-  .unit { font-size: 0.9rem; color: #667; }
-  .on { color: #f06040; }
-  .off { color: #40b080; }
-  .temp { color: #50aaff; }
-  .updated { margin-top: 24px; font-size: 0.7rem; color: #445; }
-  #status { margin-top: 8px; font-size: 0.7rem; }
-  .live { color: #40b080; }
-  .stale { color: #f06040; }
+    body {
+        font-family: "Times New Roman", Times, serif;
+        background: #c0c0c0;
+        color: #000;
+        margin: 0;
+        padding: 20px;
+    }
+    .page {
+        max-width: 580px;
+        margin: 0 auto;
+    }
+    .titlebar {
+        background: #000080;
+        color: #fff;
+        font-weight: bold;
+        font-size: 14px;
+        padding: 3px 6px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .titlebar-buttons span {
+        display: inline-block;
+        width: 16px;
+        height: 14px;
+        background: #c0c0c0;
+        border: 2px outset #fff;
+        text-align: center;
+        font-size: 10px;
+        line-height: 10px;
+        margin-left: 2px;
+        cursor: default;
+    }
+    .panel {
+        border: 2px outset #fff;
+        background: #c0c0c0;
+        padding: 16px;
+        margin-bottom: 8px;
+    }
+    .panel-inset {
+        border: 2px inset #888;
+        background: #fff;
+        padding: 12px;
+        margin: 8px 0;
+    }
+    h1 {
+        font-size: 22px;
+        text-align: center;
+        margin: 0 0 4px 0;
+    }
+    hr {
+        border: none;
+        border-top: 2px groove #c0c0c0;
+        margin: 10px 0;
+    }
+    .readings {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 8px 0;
+    }
+    .reading-box {
+        border: 2px inset #888;
+        background: #fff;
+        padding: 10px;
+        text-align: center;
+    }
+    .reading-label {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 4px;
+    }
+    .reading-value {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    .reading-unit {
+        font-size: 12px;
+        color: #666;
+    }
+    .status-line {
+        text-align: center;
+        margin: 6px 0;
+    }
+    .status-badge {
+        display: inline-block;
+        font-size: 16px;
+        font-weight: bold;
+        padding: 3px 14px;
+        border: 2px outset #fff;
+        min-width: 60px;
+    }
+    .status-on {
+        background: #00aa00;
+        color: #fff;
+        animation: blink90s 1.5s step-end infinite;
+    }
+    .status-off {
+        background: #cc0000;
+        color: #fff;
+    }
+    .status-unknown {
+        background: #808080;
+        color: #fff;
+    }
+    @keyframes blink90s {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    .updated {
+        font-size: 12px;
+        color: #666;
+        text-align: center;
+        margin-top: 8px;
+    }
+    .connection {
+        text-align: center;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+    .live { color: #00aa00; font-weight: bold; }
+    .error { color: #cc0000; font-weight: bold; }
+    .footer {
+        text-align: center;
+        font-size: 11px;
+        color: #666;
+        margin-top: 6px;
+    }
+    .counter {
+        text-align: center;
+        font-size: 11px;
+        color: #808080;
+        margin-top: 10px;
+    }
 </style>
 </head>
 <body>
-  <h1>Biodigester Monitor</h1>
-  <div class="grid">
-    <div class="card">
-      <div class="label">Biodigester</div>
-      <div class="value temp" id="bio">--</div>
-      <div class="unit">&deg;C</div>
+<div class="page">
+    <div class="titlebar">
+        <span>Biodigester Monitor v2</span>
+        <div class="titlebar-buttons">
+            <span>_</span><span>&square;</span><span>&times;</span>
+        </div>
     </div>
-    <div class="card">
-      <div class="label">Water Tank</div>
-      <div class="value temp" id="water">--</div>
-      <div class="unit">&deg;C</div>
+    <div class="panel">
+        <h1>Biodigester Monitor</h1>
+        <hr>
+        <div class="readings">
+            <div class="reading-box">
+                <div class="reading-label">Biodigester Temp</div>
+                <div class="reading-value" id="bio">--</div>
+                <div class="reading-unit">&deg;C</div>
+            </div>
+            <div class="reading-box">
+                <div class="reading-label">Water Tank Temp</div>
+                <div class="reading-value" id="water">--</div>
+                <div class="reading-unit">&deg;C</div>
+            </div>
+        </div>
+        <div class="panel-inset">
+            <div class="readings" style="margin:0">
+                <div>
+                    <div class="reading-label">Heater</div>
+                    <div class="status-line">
+                        <span class="status-badge status-unknown" id="heater">--</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="reading-label">Motor</div>
+                    <div class="status-line">
+                        <span class="status-badge status-unknown" id="motor">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="updated">Last update: <span id="time">--</span></div>
+        <div class="connection" id="status"></div>
     </div>
-    <div class="card">
-      <div class="label">Heater</div>
-      <div class="value" id="heater">--</div>
-    </div>
-    <div class="card">
-      <div class="label">Motor</div>
-      <div class="value" id="motor">--</div>
-    </div>
-  </div>
-  <div class="updated">Last update: <span id="time">--</span></div>
-  <div id="status"></div>
+    <div class="footer">Biodigester Automation - UCR. 2026</div>
+    <div class="counter">Visitor No. <span id="visitor">???</span></div>
+</div>
 
 <script>
+document.getElementById("visitor").textContent = String(Math.floor(Math.random() * 9000) + 1000);
+
 async function refresh() {
-  try {
-    const res = await fetch("/api/data");
-    const d = await res.json();
-    document.getElementById("bio").textContent = d.biodigester_temp != null ? d.biodigester_temp.toFixed(1) : "--";
-    document.getElementById("water").textContent = d.water_temp != null ? d.water_temp.toFixed(1) : "--";
+    try {
+        const res = await fetch("/api/data");
+        const d = await res.json();
+        document.getElementById("bio").textContent = d.biodigester_temp != null ? d.biodigester_temp.toFixed(1) : "--";
+        document.getElementById("water").textContent = d.water_temp != null ? d.water_temp.toFixed(1) : "--";
 
-    const heaterEl = document.getElementById("heater");
-    heaterEl.textContent = d.heater != null ? (d.heater ? "ON" : "OFF") : "--";
-    heaterEl.className = "value " + (d.heater ? "on" : "off");
+        const heaterEl = document.getElementById("heater");
+        if (d.heater != null) {
+            heaterEl.textContent = d.heater ? "ON" : "OFF";
+            heaterEl.className = "status-badge " + (d.heater ? "status-on" : "status-off");
+        } else {
+            heaterEl.textContent = "--";
+            heaterEl.className = "status-badge status-unknown";
+        }
 
-    const motorEl = document.getElementById("motor");
-    motorEl.textContent = d.motor != null ? (d.motor ? "ON" : "OFF") : "--";
-    motorEl.className = "value " + (d.motor ? "on" : "off");
+        const motorEl = document.getElementById("motor");
+        if (d.motor != null) {
+            motorEl.textContent = d.motor ? "ON" : "OFF";
+            motorEl.className = "status-badge " + (d.motor ? "status-on" : "status-off");
+        } else {
+            motorEl.textContent = "--";
+            motorEl.className = "status-badge status-unknown";
+        }
 
-    document.getElementById("time").textContent = d.updated_at || "--";
-    document.getElementById("status").innerHTML = '<span class="live">LIVE</span>';
-  } catch (e) {
-    document.getElementById("status").innerHTML = '<span class="stale">CONNECTION ERROR</span>';
-  }
+        document.getElementById("time").textContent = d.updated_at || "--";
+        document.getElementById("status").innerHTML = '<span class="live">&#9679; LIVE</span>';
+    } catch (e) {
+        document.getElementById("status").innerHTML = '<span class="error">&#9679; CONNECTION ERROR</span>';
+    }
 }
 refresh();
 setInterval(refresh, 3000);

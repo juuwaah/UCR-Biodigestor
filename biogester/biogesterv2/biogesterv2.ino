@@ -14,7 +14,7 @@ const char* password = "yoyoyoyo";
 
 // ===== DS18B20 Pin (Biodigester + Water Tank) =====
 // Both sensors share a single OneWire bus on GPIO4
-// Red=3.3V, Black=GND, Yellow=DATA
+// Red=3.3V, Black=GND, White=DATA
 // 4.7kohm pull-up resistor required between VCC (3.3V) and DATA
 #define ONE_WIRE_BUS 4
 

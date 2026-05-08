@@ -77,6 +77,13 @@ void setup() {
 
   ds18b20.begin();
 
+  Wire.begin();
+  Serial.println("I2C scan:");
+  for (byte a = 1; a < 127; a++) {
+    Wire.beginTransmission(a);
+    if (Wire.endTransmission() == 0)
+      Serial.printf("  Found: 0x%02X\n", a);
+  }
   lcd.init();
   lcd.backlight();
   lcd.print("Biodigester v2");

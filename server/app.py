@@ -237,6 +237,28 @@ async function refresh() {
     try {
         const res = await fetch("/api/data");
         const d = await res.json();
+        // Check if data is stale (no update in 60s)
+        let stale = true;
+        if (d.updated_at) {
+            const utcDate = new Date(d.updated_at + " UTC");
+            const ageSec = (Date.now() - utcDate.getTime()) / 1000;
+            stale = ageSec > 60;
+        }
+
+        if (stale) {
+            document.getElementById("bio").textContent = "--";
+            document.getElementById("water").textContent = "--";
+            const heaterEl = document.getElementById("heater");
+            heaterEl.textContent = "--";
+            heaterEl.className = "status-badge status-unknown";
+            const motorEl = document.getElementById("motor");
+            motorEl.textContent = "--";
+            motorEl.className = "status-badge status-unknown";
+            document.getElementById("time").textContent = "--";
+            document.getElementById("status").innerHTML = '<span class="error">&#9679; DISPOSITIVO DESCONECTADO</span>';
+            return;
+        }
+
         document.getElementById("bio").textContent = d.biodigester_temp != null ? d.biodigester_temp.toFixed(1) : "--";
         document.getElementById("water").textContent = d.water_temp != null ? d.water_temp.toFixed(1) : "--";
 
@@ -259,16 +281,12 @@ async function refresh() {
         }
 
         // Convert to Costa Rica time (UTC-6)
-        if (d.updated_at) {
-            const utcDate = new Date(d.updated_at + " UTC");
-            const crDate = new Date(utcDate.getTime() - 6 * 60 * 60 * 1000);
-            const h = String(crDate.getUTCHours()).padStart(2, "0");
-            const m = String(crDate.getUTCMinutes()).padStart(2, "0");
-            const s = String(crDate.getUTCSeconds()).padStart(2, "0");
-            document.getElementById("time").textContent = h + ":" + m + ":" + s + " (Costa Rica)";
-        } else {
-            document.getElementById("time").textContent = "--";
-        }
+        const utcDate2 = new Date(d.updated_at + " UTC");
+        const crDate = new Date(utcDate2.getTime() - 6 * 60 * 60 * 1000);
+        const h = String(crDate.getUTCHours()).padStart(2, "0");
+        const m = String(crDate.getUTCMinutes()).padStart(2, "0");
+        const s = String(crDate.getUTCSeconds()).padStart(2, "0");
+        document.getElementById("time").textContent = h + ":" + m + ":" + s + " (Costa Rica)";
         document.getElementById("status").innerHTML = '<span class="live">&#9679; EN VIVO</span>';
     } catch (e) {
         document.getElementById("status").innerHTML = '<span class="error">&#9679; ERROR DE CONEXION</span>';

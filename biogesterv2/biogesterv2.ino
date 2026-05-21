@@ -5,9 +5,22 @@
 #include <DallasTemperature.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include "esp_eap_client.h"  // ESP32 Arduino Core 3.x
 
+#define USE_EDUROAM
+
+// 既存WiFi設定
 const char* ssid     = "b(second)";
 const char* password = "yoyoyoyo";
+
+// Eduroam設定
+#ifdef USE_EDUROAM
+#define EDUROAM_SSID       "eduroam"
+#define EDUROAM_ANON_ID    "anonymous@ucr.ac.cr"    // 外部identity
+#define EDUROAM_IDENTITY   "bakuho.goto@ucr.ac.cr"  // 内部identity
+#define EDUROAM_PASSWORD   "AGUacate2001##"
+#endif
+
 const char* serverURL = "https://ucr-biogestor-production.up.railway.app/api/data";
 
 #define ONE_WIRE_BUS 4
@@ -90,13 +103,47 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("WiFi...");
 
+#ifdef USE_EDUROAM
+  Serial.println("Connecting to eduroam (WPA2-Enterprise)...");
+  WiFi.disconnect(true);
+  delay(1000);
+  WiFi.mode(WIFI_STA);
+  delay(100);
+  esp_eap_client_set_identity((uint8_t*)EDUROAM_ANON_ID, strlen(EDUROAM_ANON_ID));
+  esp_eap_client_set_username((uint8_t*)EDUROAM_IDENTITY, strlen(EDUROAM_IDENTITY));
+  esp_eap_client_set_password((uint8_t*)EDUROAM_PASSWORD, strlen(EDUROAM_PASSWORD));
+  esp_eap_client_set_ttls_phase2_method(ESP_EAP_TTLS_PHASE2_PAP);
+  esp_eap_client_set_disable_time_check(true);
+  esp_wifi_sta_enterprise_enable();
+  WiFi.begin(EDUROAM_SSID);
+#else
+  Serial.printf("Connecting to %s (WPA-Personal)...\n", ssid);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) delay(500);
+#endif
+
+  unsigned long wifiStart = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() - wifiStart > 30000) {
+      Serial.println("WiFi connection timeout!");
+      break;
+    }
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println();
 
   lcd.clear();
-  lcd.print("WiFi OK");
-  lcd.setCursor(0, 1);
-  lcd.print(WiFi.localIP().toString());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("WiFi connected! IP: %s\n", WiFi.localIP().toString().c_str());
+    lcd.print("WiFi OK");
+    lcd.setCursor(0, 1);
+    lcd.print(WiFi.localIP().toString());
+  } else {
+    Serial.printf("WiFi FAILED (final status: %d)\n", WiFi.status());
+    lcd.print("WiFi FAILED");
+    lcd.setCursor(0, 1);
+    lcd.print("Running offline");
+  }
   delay(2000);
   lcd.clear();
 

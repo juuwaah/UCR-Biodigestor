@@ -229,7 +229,7 @@ PAGE = """
         <div class="updated">Ultima actualizacion: <span id="time">--</span></div>
         <div class="connection" id="status"></div>
     </div>
-    <div class="footer">Automatizacion por Bakuho Goto - UCR-IDS. 2026</div>
+    <div class="footer">Automatizacion por Bakuho Goto - UCR-IDS. 2026<br><a href="https://github.com/juuwaah/UCR-Biodigestor" style="color:#666">github.com/juuwaah/UCR-Biodigestor</a></div>
 </div>
 
 <script>

@@ -21,7 +21,7 @@ const char* password = "yoyoyoyo";
 #define EDUROAM_PASSWORD   "AGUacate2001##"
 #endif
 
-const char* serverURL = "https://ucr-biogestor-production.up.railway.app/api/data";
+const char* serverURL = "https://ucr-biodigestor-production.up.railway.app/api/data";
 
 #define ONE_WIRE_BUS 4
 #define SSR_HEATER   25

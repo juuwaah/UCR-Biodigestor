@@ -1,5 +1,7 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, Response
 from datetime import datetime, timezone, timedelta
+import os
+import psycopg2
 
 app = Flask(__name__)
 
@@ -14,6 +16,41 @@ latest = {
 
 UTC = timezone.utc
 
+# --------------- Database helpers ---------------
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def get_conn():
+    """Return a new psycopg2 connection (caller must close)."""
+    return psycopg2.connect(DATABASE_URL)
+
+
+def init_db():
+    """Create the readings table if it doesn't exist."""
+    if not DATABASE_URL:
+        return
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS readings (
+                    id      SERIAL PRIMARY KEY,
+                    timestamp       TIMESTAMP NOT NULL,
+                    biodigester_temp REAL,
+                    heater  BOOLEAN
+                );
+            """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+init_db()
+
+
+# --------------- Routes ---------------
+
 # ESP32 posts data here
 @app.route("/api/data", methods=["POST"])
 def receive_data():
@@ -25,6 +62,21 @@ def receive_data():
     latest["heater"] = data.get("heater")
     latest["motor"] = data.get("motor")
     latest["updated_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+    # Persist to PostgreSQL
+    if DATABASE_URL:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO readings (timestamp, biodigester_temp, heater)
+                       VALUES (NOW() AT TIME ZONE 'America/Costa_Rica', %s, %s)""",
+                    (data.get("biodigester_temp"), data.get("heater")),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
     return jsonify({"status": "ok"})
 
 
@@ -32,6 +84,56 @@ def receive_data():
 @app.route("/api/data", methods=["GET"])
 def get_data():
     return jsonify(latest)
+
+
+# History JSON (for graph & table)
+@app.route("/api/history")
+def history_json():
+    if not DATABASE_URL:
+        return jsonify([])
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT timestamp, biodigester_temp, heater FROM readings ORDER BY timestamp"
+            )
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    result = []
+    for ts, temp, heater in rows:
+        result.append({
+            "timestamp": ts.strftime("%Y-%m-%d %H:%M"),
+            "biodigester_temp": temp,
+            "heater": heater,
+        })
+    return jsonify(result)
+
+
+# History CSV download
+@app.route("/api/history/csv")
+def history_csv():
+    if not DATABASE_URL:
+        return Response("timestamp,biodigester_temp,heater\n",
+                        mimetype="text/csv",
+                        headers={"Content-Disposition": "attachment; filename=readings.csv"})
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT timestamp, biodigester_temp, heater FROM readings ORDER BY timestamp"
+            )
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    lines = ["timestamp,biodigester_temp,heater"]
+    for ts, temp, heater in rows:
+        lines.append(f"{ts.strftime('%Y-%m-%d %H:%M')},{temp},{heater}")
+    csv_text = "\n".join(lines) + "\n"
+    return Response(csv_text,
+                    mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=readings.csv"})
 
 
 # Dashboard
@@ -47,6 +149,7 @@ PAGE = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Biodigester Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
     body {
         font-family: "Times New Roman", Times, serif;
@@ -98,6 +201,10 @@ PAGE = """
         font-size: 22px;
         text-align: center;
         margin: 0 0 4px 0;
+    }
+    h2 {
+        font-size: 16px;
+        margin: 0 0 8px 0;
     }
     hr {
         border: none;
@@ -184,6 +291,49 @@ PAGE = """
         color: #808080;
         margin-top: 10px;
     }
+    /* History section */
+    .chart-container {
+        border: 2px inset #888;
+        background: #fff;
+        padding: 8px;
+        margin: 8px 0;
+    }
+    .csv-table-wrap {
+        border: 2px inset #888;
+        background: #fff;
+        max-height: 260px;
+        overflow-y: auto;
+        margin: 8px 0;
+    }
+    .csv-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .csv-table th {
+        background: #c0c0c0;
+        border: 1px solid #888;
+        padding: 3px 6px;
+        position: sticky;
+        top: 0;
+        text-align: left;
+    }
+    .csv-table td {
+        border: 1px solid #ccc;
+        padding: 3px 6px;
+    }
+    .btn-download {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 14px;
+        padding: 4px 16px;
+        border: 2px outset #fff;
+        background: #c0c0c0;
+        cursor: pointer;
+        margin-top: 8px;
+    }
+    .btn-download:active {
+        border-style: inset;
+    }
 </style>
 </head>
 <body>
@@ -229,6 +379,27 @@ PAGE = """
         <div class="updated">Ultima actualizacion: <span id="time">--</span></div>
         <div class="connection" id="status"></div>
     </div>
+
+    <!-- History panel -->
+    <div class="panel">
+        <h2>Historial de Temperatura</h2>
+        <hr>
+        <div class="chart-container">
+            <canvas id="tempChart" height="200"></canvas>
+        </div>
+        <hr>
+        <h2>Tabla de Datos</h2>
+        <div class="csv-table-wrap">
+            <table class="csv-table">
+                <thead>
+                    <tr><th>Hora</th><th>Temp Purin (&deg;C)</th><th>Circulacion</th></tr>
+                </thead>
+                <tbody id="csvBody"></tbody>
+            </table>
+        </div>
+        <button class="btn-download" onclick="window.location.href='/api/history/csv'">Descargar CSV</button>
+    </div>
+
     <div class="footer">Automatizacion por Bakuho Goto - UCR-IDS. 2026<br><a href="https://github.com/juuwaah/UCR-Biodigestor" style="color:#666">github.com/juuwaah/UCR-Biodigestor</a></div>
 </div>
 
@@ -294,6 +465,63 @@ async function refresh() {
 }
 refresh();
 setInterval(refresh, 3000);
+
+// ---------- History: graph + table ----------
+let tempChart = null;
+
+async function loadHistory() {
+    try {
+        const res = await fetch("/api/history");
+        const rows = await res.json();
+        if (!rows.length) return;
+
+        const labels = rows.map(r => r.timestamp.split(" ")[1]);  // HH:MM
+        const temps  = rows.map(r => r.biodigester_temp);
+
+        // Chart
+        const ctx = document.getElementById("tempChart").getContext("2d");
+        if (tempChart) tempChart.destroy();
+        tempChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Temp Purin (°C)",
+                    data: temps,
+                    borderColor: "#000080",
+                    backgroundColor: "rgba(0,0,128,0.1)",
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { title: { display: true, text: "Hora" } },
+                    y: { title: { display: true, text: "°C" } }
+                }
+            }
+        });
+
+        // Table
+        const tbody = document.getElementById("csvBody");
+        tbody.innerHTML = "";
+        rows.forEach(r => {
+            const tr = document.createElement("tr");
+            const time = r.timestamp.split(" ")[1] || r.timestamp;
+            const temp = r.biodigester_temp != null ? r.biodigester_temp.toFixed(1) : "--";
+            const circ = r.heater != null ? (r.heater ? "ON" : "OFF") : "--";
+            tr.innerHTML = "<td>" + time + "</td><td>" + temp + "</td><td>" + circ + "</td>";
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Failed to load history:", e);
+    }
+}
+loadHistory();
 </script>
 </body>
 </html>

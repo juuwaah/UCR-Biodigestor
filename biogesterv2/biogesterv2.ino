@@ -14,11 +14,12 @@ const char* ssid     = "b(second)";
 const char* password = "yoyoyoyo";
 
 // Eduroam設定
+
 #ifdef USE_EDUROAM
 #define EDUROAM_SSID       "eduroam"
 #define EDUROAM_ANON_ID    "anonymous@ucr.ac.cr"    // 外部identity
 #define EDUROAM_IDENTITY   "bakuho.goto@ucr.ac.cr"  // 内部identity
-#define EDUROAM_PASSWORD   "AGUacate2001##"
+#define EDUROAM_PASSWORD   "AguaCate2001##"
 #endif
 
 const char* serverURL = "https://ucr-biodigestor-production.up.railway.app/api/data";
@@ -28,8 +29,9 @@ const char* serverURL = "https://ucr-biodigestor-production.up.railway.app/api/d
 #define MOTOR_PIN    26
 #define LCD_ADDR     0x27
 
-const float TEMP_ON  = 37.0;
-const float TEMP_OFF = 38.0;
+const float TEMP_ON    = 37.0;
+const float TEMP_OFF   = 38.0;
+const float WATER_MAX  = 60.0;
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature ds18b20(&oneWire);
@@ -147,6 +149,12 @@ void setup() {
   delay(2000);
   lcd.clear();
 
+  ds18b20.requestTemperatures();
+  bioTemp = ds18b20.getTempCByIndex(0);
+  if (bioTemp != DEVICE_DISCONNECTED_C && bioTemp <= 37.5) {
+    setOutputs(true);
+  }
+
   Serial.println("System ready");
 }
 
@@ -164,8 +172,13 @@ void loop() {
     return;
   }
 
-  if (!heaterState && bioTemp < TEMP_ON)       setOutputs(true);
-  else if (heaterState && bioTemp > TEMP_OFF)  setOutputs(false);
+  if (waterTemp > WATER_MAX) {
+    setOutputs(false);
+  } else if (!heaterState && bioTemp < TEMP_ON) {
+    setOutputs(true);
+  } else if (heaterState && bioTemp > TEMP_OFF) {
+    setOutputs(false);
+  }
 
   updateLCD();
   sendToServer();

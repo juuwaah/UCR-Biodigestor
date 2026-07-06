@@ -473,13 +473,24 @@ async function loadHistory() {
     try {
         const res = await fetch("/api/history");
         const rows = await res.json();
-        if (!rows.length) return;
+
+        const ctx = document.getElementById("tempChart").getContext("2d");
+
+        if (!rows.length) {
+            if (tempChart) { tempChart.destroy(); tempChart = null; }
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.fillStyle = "#888";
+            ctx.font = "14px Times New Roman";
+            ctx.textAlign = "center";
+            ctx.fillText("Sin datos aún", ctx.canvas.width / 2, ctx.canvas.height / 2);
+            document.getElementById("csvBody").innerHTML = "";
+            return;
+        }
 
         const labels = rows.map(r => r.timestamp.split(" ")[1]);  // HH:MM
         const temps  = rows.map(r => r.biodigester_temp);
 
         // Chart
-        const ctx = document.getElementById("tempChart").getContext("2d");
         if (tempChart) tempChart.destroy();
         tempChart = new Chart(ctx, {
             type: "line",
@@ -517,11 +528,15 @@ async function loadHistory() {
             tr.innerHTML = "<td>" + time + "</td><td>" + temp + "</td><td>" + circ + "</td>";
             tbody.appendChild(tr);
         });
+        // 最新行までスクロール
+        const wrap = document.querySelector(".csv-table-wrap");
+        wrap.scrollTop = wrap.scrollHeight;
     } catch (e) {
         console.error("Failed to load history:", e);
     }
 }
 loadHistory();
+setInterval(loadHistory, 30000);
 </script>
 </body>
 </html>

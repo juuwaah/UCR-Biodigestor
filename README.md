@@ -102,4 +102,42 @@ See `server/requirements.txt`. Deployed via `server/Procfile` on Railway.
 
 ---
 
+## Future Plans
+
+### 1. Second DC 12V Circulation Motor (Stable Water Flow)
+
+A second peristaltic pump will be added in series (tube) with the existing G328 pump to improve water flow stability. Electrically, the second motor's MOSFET module (same type, rated for 0.5 mA gate current) will have its PWM input connected in parallel with GPIO26, sharing the same control signal. No firmware changes are required — both motors will switch on/off together via the existing hysteresis logic.
+
+| Item | Detail |
+|---|---|
+| GPIO | GPIO26 (shared with existing motor) |
+| Wiring | Second MOSFET module PWM input in parallel with first |
+| Tube topology | Two pumps in series |
+
+### 2. Float Switch — Water Level Safety (GPIO25 / Heater SSR)
+
+A float switch (M12, spring-contact type) will be installed in the hot water tank and wired in series with the GPIO25 SSR control line. This provides a hardware-level interlock: if the water level drops below the safe minimum, the float switch opens the circuit and cuts the heater regardless of firmware state, preventing dry-run damage to the heating element.
+
+**Wiring intent:** Install Way 1 configuration (water present → spring connects → circuit closed → heater can operate; water too low → spring opens → circuit broken → heater forced off).
+
+| Item | Detail |
+|---|---|
+| Sensor | M12 float switch, spring-contact |
+| GPIO | Series with GPIO25 SSR control signal |
+| Fail-safe behavior | Heater OFF when water level insufficient |
+
+### 3. Thermal Fuse — Overheat Protection (Water Tank Flange)
+
+A thermal fuse will be mounted on the outside of the water container flange as a last-resort overheat cutoff. Under normal operating conditions the water temperature peaks around 60 °C; a 100 °C fuse provides a comfortable margin while still catching runaway heating scenarios.
+
+| Item | Detail |
+|---|---|
+| Mounting location | Outside of water container flange |
+| Fuse rating | 250 V / 10 A |
+| Trip temperature | 100 °C |
+| Heater spec | 120 V AC / 8 A |
+| Normal max water temp | ~60 °C |
+
+---
+
 Bakuho Goto - UCR-IDS, 2026

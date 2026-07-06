@@ -29,9 +29,12 @@ const char* serverURL = "https://ucr-biodigestor-production.up.railway.app/api/d
 #define MOTOR_PIN    26
 #define LCD_ADDR     0x27
 
-const float TEMP_ON    = 37.0;
-const float TEMP_OFF   = 38.0;
-const float WATER_MAX  = 60.0;
+const float TEMP_ON    = 37.5;
+const float TEMP_OFF   = 37.5;  // dead band = 0, single threshold
+const float WATER_ON   = 58.0;
+const float WATER_OFF  = 60.0;
+const float WATER_ABS_MAX = 85.0;              // 絶対上限
+const unsigned long HEATER_MAX_MS = 3600000UL; // 連続稼働上限 60分
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature ds18b20(&oneWire);
@@ -39,14 +42,20 @@ LiquidCrystal_I2C lcd(LCD_ADDR, 20, 4);
 
 bool heaterState = false;
 bool motorState  = false;
+bool sensorFault = false;
 float bioTemp    = 0.0;
 float waterTemp  = 0.0;
+unsigned long heaterOnSince = 0;
 
-void setOutputs(bool on) {
+void setHeater(bool on) {
+  if (on && !heaterState) heaterOnSince = millis();
   heaterState = on;
-  motorState  = on;
   digitalWrite(SSR_HEATER, on ? HIGH : LOW);
-  digitalWrite(MOTOR_PIN,  on ? HIGH : LOW);
+}
+
+void setMotor(bool on) {
+  motorState = on;
+  digitalWrite(MOTOR_PIN, on ? HIGH : LOW);
 }
 
 void updateLCD() {
@@ -74,6 +83,8 @@ void sendToServer() {
   client.setInsecure();
   HTTPClient http;
   http.begin(client, serverURL);
+  http.setConnectTimeout(3000);
+  http.setTimeout(3000);
   http.addHeader("Content-Type", "application/json");
   int code = http.POST(json);
   if (code <= 0) {
@@ -150,9 +161,11 @@ void setup() {
   lcd.clear();
 
   ds18b20.requestTemperatures();
-  bioTemp = ds18b20.getTempCByIndex(0);
+  bioTemp   = ds18b20.getTempCByIndex(0);
+  waterTemp = ds18b20.getTempCByIndex(1);
   if (bioTemp != DEVICE_DISCONNECTED_C && bioTemp <= 37.5) {
-    setOutputs(true);
+    setMotor(true);
+    if (waterTemp < WATER_OFF) setHeater(true);
   }
 
   Serial.println("System ready");
@@ -163,21 +176,63 @@ void loop() {
   bioTemp   = ds18b20.getTempCByIndex(0);
   waterTemp = ds18b20.getTempCByIndex(1);
 
-  if (bioTemp == DEVICE_DISCONNECTED_C) {
-    Serial.println("Bio sensor error!");
-    setOutputs(false);
+  // --- 保護 #1: センサー切断チェック ---
+  sensorFault = (bioTemp == DEVICE_DISCONNECTED_C ||
+                 waterTemp == DEVICE_DISCONNECTED_C);
+  if (sensorFault) {
+    Serial.println("SENSOR FAULT! Shutting down.");
+    setHeater(false);
+    setMotor(false);
+    lcd.setCursor(0, 2);
+    lcd.print("SENSOR FAULT!       ");
     lcd.setCursor(0, 3);
-    lcd.print("SENSOR ERROR!       ");
+    if (bioTemp == DEVICE_DISCONNECTED_C)   lcd.print("Bio disconnected    ");
+    else                                     lcd.print("Water disconnected  ");
     delay(2000);
     return;
   }
 
-  if (waterTemp > WATER_MAX) {
-    setOutputs(false);
-  } else if (!heaterState && bioTemp < TEMP_ON) {
-    setOutputs(true);
-  } else if (heaterState && bioTemp > TEMP_OFF) {
-    setOutputs(false);
+  // --- 保護 #2: 絶対上限温度 ---
+  if (waterTemp > WATER_ABS_MAX) {
+    Serial.println("WATER OVER 85C! Emergency stop.");
+    setHeater(false);
+    setMotor(false);
+    lcd.setCursor(0, 3);
+    lcd.print("OVERHEAT EMERGENCY! ");
+    delay(2000);
+    return;
+  }
+
+  // --- 保護 #3: ヒーター連続稼働時間制限 ---
+  bool heaterTimeout = (heaterState &&
+                        (millis() - heaterOnSince) > HEATER_MAX_MS);
+  if (heaterTimeout) {
+    Serial.println("HEATER TIMEOUT 60min! Forced OFF.");
+    setHeater(false);
+    lcd.setCursor(0, 3);
+    lcd.print("HEATER TIMEOUT!     ");
+    delay(5000);
+    // タイマーリセットのため次のサイクルで再ONを許可
+  }
+
+  // --- 通常制御 ---
+  bool needsHeating;
+  if (bioTemp < TEMP_ON)       needsHeating = true;
+  else if (bioTemp > TEMP_OFF) needsHeating = false;
+  else                         needsHeating = heaterState;
+
+  if (!needsHeating) {
+    setHeater(false);
+    setMotor(false);
+  } else {
+    setMotor(true);
+    if (heaterTimeout) {
+      // タイムアウト直後はOFFを維持、次サイクルで復帰
+    } else if (waterTemp > WATER_OFF) {
+      setHeater(false);
+    } else if (waterTemp < WATER_ON) {
+      setHeater(true);
+    }
   }
 
   updateLCD();

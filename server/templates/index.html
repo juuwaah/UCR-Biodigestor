@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biodigester Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="page">
+    <div class="titlebar">
+        <span>UCR-IDS</span>
+        <div class="titlebar-buttons">
+            <span>_</span><span>&square;</span><span>&times;</span>
+        </div>
+    </div>
+    <div class="panel">
+        <h1>Monitor de Biogestor v2</h1>
+        <hr>
+        <div class="readings">
+            <div class="reading-box">
+                <div class="reading-label">Temp de Biogestor</div>
+                <div class="reading-value" id="bio">--</div>
+                <div class="reading-unit">&deg;C</div>
+            </div>
+            <div class="reading-box">
+                <div class="reading-label">Temp del tanque</div>
+                <div class="reading-value" id="water">--</div>
+                <div class="reading-unit">&deg;C</div>
+            </div>
+        </div>
+        <div class="panel-inset">
+            <div class="readings" style="margin:0">
+                <div>
+                    <div class="reading-label">Calentador</div>
+                    <div class="status-line">
+                        <span class="status-badge status-unknown" id="heater">--</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="reading-label">Bomba/ motor</div>
+                    <div class="status-line">
+                        <span class="status-badge status-unknown" id="motor">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="updated">Ultima actualizacion: <span id="time">--</span></div>
+        <div class="connection" id="status"></div>
+    </div>
+
+    <div class="panel">
+        <h2>Historial de Temperatura</h2>
+        <hr>
+        <div class="chart-container">
+            <canvas id="tempChart" height="200"></canvas>
+        </div>
+        <hr>
+        <h2>Tabla de Datos</h2>
+        <div class="csv-table-wrap">
+            <table class="csv-table">
+                <thead>
+                    <tr><th>Hora</th><th>Temp Purin (&deg;C)</th><th>Circulacion</th></tr>
+                </thead>
+                <tbody id="csvBody"></tbody>
+            </table>
+        </div>
+        <button class="btn-download" onclick="window.location.href='/api/history/csv'">Descargar CSV</button>
+    </div>
+
+    <div class="footer">
+        Automatizacion por Bakuho Goto - UCR-IDS. 2026<br>
+        <a href="https://github.com/juuwaah/UCR-Biodigestor" style="color:#666">github.com/juuwaah/UCR-Biodigestor</a>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

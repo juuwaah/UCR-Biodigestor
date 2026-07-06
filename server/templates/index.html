@@ -16,7 +16,7 @@
         </div>
     </div>
     <div class="panel">
-        <h1>Monitor de Biogestor v2</h1>
+        <h1>Monitor de Biogestor Milo</h1>
         <hr>
         <div class="readings">
             <div class="reading-box">
@@ -67,7 +67,10 @@
                 <tbody id="csvBody"></tbody>
             </table>
         </div>
-        <button class="btn-download" onclick="window.location.href='/api/history/csv'">Descargar CSV</button>
+        <div class="btn-row">
+            <button class="btn-download" onclick="window.location.href='/api/history/csv'">Descargar CSV</button>
+            <button class="btn-reset" onclick="resetHistory()">Resetear datos</button>
+        </div>
     </div>
 
     <div class="footer">

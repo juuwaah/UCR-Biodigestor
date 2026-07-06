@@ -128,3 +128,13 @@ async function loadHistory() {
 }
 loadHistory();
 setInterval(loadHistory, 30000);
+
+async function resetHistory() {
+    if (!confirm("全データを削除しますか？この操作は元に戻せません。")) return;
+    try {
+        const res = await fetch("/api/history", { method: "DELETE" });
+        if (res.ok) loadHistory();
+    } catch (e) {
+        alert("Error al resetear datos");
+    }
+}

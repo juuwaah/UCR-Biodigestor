@@ -31,8 +31,8 @@ const char* serverURL = "https://ucr-biodigestor-production.up.railway.app/api/d
 
 const float TEMP_ON    = 37.5;
 const float TEMP_OFF   = 37.5;  // dead band = 0, single threshold
-const float WATER_ON   = 58.0;
-const float WATER_OFF  = 60.0;
+const float WATER_ON   = 53.0;
+const float WATER_OFF  = 65.0;
 const float WATER_ABS_MAX = 85.0;              // 絶対上限
 const unsigned long HEATER_MAX_MS = 3600000UL; // 連続稼働上限 60分
 

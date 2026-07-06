@@ -174,3 +174,20 @@ hr {
 .btn-download:active {
     border-style: inset;
 }
+.btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.btn-reset {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 14px;
+    padding: 4px 16px;
+    border: 2px outset #fff;
+    background: #cc0000;
+    color: #fff;
+    cursor: pointer;
+}
+.btn-reset:active {
+    border-style: inset;
+}

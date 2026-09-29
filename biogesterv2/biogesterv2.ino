@@ -9,75 +9,54 @@
 
 #define USE_EDUROAM
 
-// 既存WiFi設定
-const char* ssid     = "b(second)";
-const char* password = "yoyoyoyo";
-
-// Eduroam設定
-
-#ifdef USE_EDUROAM
-#define EDUROAM_SSID       "eduroam"
-#define EDUROAM_ANON_ID    "anonymous@ucr.ac.cr"    // 外部identity
-#define EDUROAM_IDENTITY   "bakuho.goto@ucr.ac.cr"  // 内部identity
-#define EDUROAM_PASSWORD   "AguaCate2001##"
-#endif
+#include "secrets.h"  // WiFi / eduroam 認証情報（Git管理外）
 
 const char* serverURL = "https://ucr-biodigestor-production.up.railway.app/api/data";
 
 #define ONE_WIRE_BUS 4
 #define SSR_HEATER   25
-#define MOTOR_PIN    26
 #define LCD_ADDR     0x27
 
-const float TEMP_ON    = 37.5;
-const float TEMP_OFF   = 37.5;  // dead band = 0, single threshold
-const float WATER_ON   = 53.0;
-const float WATER_OFF  = 65.0;
-const float WATER_ABS_MAX = 85.0;              // 絶対上限
-const unsigned long HEATER_MAX_MS = 3600000UL; // 連続稼働上限 60分
+const float TEMP_SET = 37.5;                     // T < 37.5 → ON, それ以外 → OFF
+const unsigned long MIN_SWITCH_MS = 60000UL;     // 最低ON/OFF時間 1分
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature ds18b20(&oneWire);
 LiquidCrystal_I2C lcd(LCD_ADDR, 20, 4);
 
 bool heaterState = false;
-bool motorState  = false;
 bool sensorFault = false;
 float bioTemp    = 0.0;
-float waterTemp  = 0.0;
-unsigned long heaterOnSince = 0;
+unsigned long lastSwitch = 0;
+bool switchedOnce = false;  // 起動直後は最低時間を待たずに判断する
 
 void setHeater(bool on) {
-  if (on && !heaterState) heaterOnSince = millis();
+  if (on != heaterState) {
+    lastSwitch = millis();
+    switchedOnce = true;
+  }
   heaterState = on;
   digitalWrite(SSR_HEATER, on ? HIGH : LOW);
-}
-
-void setMotor(bool on) {
-  motorState = on;
-  digitalWrite(MOTOR_PIN, on ? HIGH : LOW);
 }
 
 void updateLCD() {
   lcd.setCursor(0, 0);
   lcd.printf("Bio:   %5.1f C", bioTemp);
   lcd.setCursor(0, 1);
-  lcd.printf("Water: %5.1f C", waterTemp);
-  lcd.setCursor(0, 2);
   lcd.printf("Heater: %s", heaterState ? "ON " : "OFF");
+  lcd.setCursor(0, 2);
+  lcd.print("                    ");
   lcd.setCursor(0, 3);
-  lcd.printf("Motor:  %s", motorState ? "ON " : "OFF");
+  lcd.print("                    ");
 }
 
 void sendToServer() {
   if (WiFi.status() != WL_CONNECTED) return;
 
-  char json[128];
+  char json[96];
   snprintf(json, sizeof(json),
-    "{\"biodigester_temp\":%.1f,\"water_temp\":%.1f,\"heater\":%s,\"motor\":%s}",
-    bioTemp, waterTemp,
-    heaterState ? "true" : "false",
-    motorState  ? "true" : "false");
+    "{\"biodigester_temp\":%.1f,\"heater\":%s}",
+    bioTemp, heaterState ? "true" : "false");
 
   WiFiClientSecure client;
   client.setInsecure();
@@ -97,9 +76,7 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(SSR_HEATER, OUTPUT);
-  pinMode(MOTOR_PIN, OUTPUT);
   digitalWrite(SSR_HEATER, LOW);
-  digitalWrite(MOTOR_PIN, LOW);
 
   ds18b20.begin();
 
@@ -112,7 +89,7 @@ void setup() {
   }
   lcd.init();
   lcd.backlight();
-  lcd.print("Biodigester v2");
+  lcd.print("Biodigester v3");
   lcd.setCursor(0, 1);
   lcd.print("WiFi...");
 
@@ -160,80 +137,30 @@ void setup() {
   delay(2000);
   lcd.clear();
 
-  ds18b20.requestTemperatures();
-  bioTemp   = ds18b20.getTempCByIndex(0);
-  waterTemp = ds18b20.getTempCByIndex(1);
-  if (bioTemp != DEVICE_DISCONNECTED_C && bioTemp <= 37.5) {
-    setMotor(true);
-    if (waterTemp < WATER_OFF) setHeater(true);
-  }
-
   Serial.println("System ready");
 }
 
 void loop() {
   ds18b20.requestTemperatures();
-  bioTemp   = ds18b20.getTempCByIndex(0);
-  waterTemp = ds18b20.getTempCByIndex(1);
+  bioTemp = ds18b20.getTempCByIndex(0);
 
-  // --- 保護 #1: センサー切断チェック ---
-  sensorFault = (bioTemp == DEVICE_DISCONNECTED_C ||
-                 waterTemp == DEVICE_DISCONNECTED_C);
+  // --- 保護: センサー切断チェック（最低時間に関係なく即OFF） ---
+  sensorFault = (bioTemp == DEVICE_DISCONNECTED_C);
   if (sensorFault) {
-    Serial.println("SENSOR FAULT! Shutting down.");
-    setHeater(false);
-    setMotor(false);
+    Serial.println("SENSOR FAULT! Heater OFF.");
+    if (heaterState) setHeater(false);
     lcd.setCursor(0, 2);
     lcd.print("SENSOR FAULT!       ");
     lcd.setCursor(0, 3);
-    if (bioTemp == DEVICE_DISCONNECTED_C)   lcd.print("Bio disconnected    ");
-    else                                     lcd.print("Water disconnected  ");
+    lcd.print("Bio disconnected    ");
     delay(2000);
     return;
   }
 
-  // --- 保護 #2: 絶対上限温度 ---
-  if (waterTemp > WATER_ABS_MAX) {
-    Serial.println("WATER OVER 85C! Emergency stop.");
-    setHeater(false);
-    setMotor(false);
-    lcd.setCursor(0, 3);
-    lcd.print("OVERHEAT EMERGENCY! ");
-    delay(2000);
-    return;
-  }
-
-  // --- 保護 #3: ヒーター連続稼働時間制限 ---
-  bool heaterTimeout = (heaterState &&
-                        (millis() - heaterOnSince) > HEATER_MAX_MS);
-  if (heaterTimeout) {
-    Serial.println("HEATER TIMEOUT 60min! Forced OFF.");
-    setHeater(false);
-    lcd.setCursor(0, 3);
-    lcd.print("HEATER TIMEOUT!     ");
-    delay(5000);
-    // タイマーリセットのため次のサイクルで再ONを許可
-  }
-
-  // --- 通常制御 ---
-  bool needsHeating;
-  if (bioTemp < TEMP_ON)       needsHeating = true;
-  else if (bioTemp > TEMP_OFF) needsHeating = false;
-  else                         needsHeating = heaterState;
-
-  if (!needsHeating) {
-    setHeater(false);
-    setMotor(false);
-  } else {
-    setMotor(true);
-    if (heaterTimeout) {
-      // タイムアウト直後はOFFを維持、次サイクルで復帰
-    } else if (waterTemp > WATER_OFF) {
-      setHeater(false);
-    } else if (waterTemp < WATER_ON) {
-      setHeater(true);
-    }
-  }
+  // --- 通常制御: T < 37.5 → ON / それ以外 → OFF、切替は最低1分空ける ---
+  bool wantHeat = (bioTemp < TEMP_SET);
+  bool canSwitch = !switchedOnce || (millis() - lastSwitch >= MIN_SWITCH_MS);
+  if (wantHeat != heaterState && canSwitch) setHeater(wantHeat);
 
   updateLCD();
   sendToServer();

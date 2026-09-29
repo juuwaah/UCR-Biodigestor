@@ -8,9 +8,7 @@ app = Flask(__name__)
 # Latest data from ESP32 (in-memory only)
 latest = {
     "biodigester_temp": None,
-    "water_temp": None,
     "heater": None,
-    "motor": None,
     "updated_at": None,
 }
 
@@ -59,9 +57,7 @@ def receive_data():
     if not data:
         return jsonify({"error": "no data"}), 400
     latest["biodigester_temp"] = data.get("biodigester_temp")
-    latest["water_temp"] = data.get("water_temp")
     latest["heater"] = data.get("heater")
-    latest["motor"] = data.get("motor")
     latest["updated_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     # Persist to PostgreSQL at most once per 60 seconds

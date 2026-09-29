@@ -12,20 +12,15 @@ async function refresh() {
 
         if (stale) {
             document.getElementById("bio").textContent = "--";
-            document.getElementById("water").textContent = "--";
             const heaterEl = document.getElementById("heater");
             heaterEl.textContent = "--";
             heaterEl.className = "status-badge status-unknown";
-            const motorEl = document.getElementById("motor");
-            motorEl.textContent = "--";
-            motorEl.className = "status-badge status-unknown";
             document.getElementById("time").textContent = "--";
             document.getElementById("status").innerHTML = '<span class="error">&#9679; DISPOSITIVO DESCONECTADO</span>';
             return;
         }
 
         document.getElementById("bio").textContent = d.biodigester_temp != null ? d.biodigester_temp.toFixed(1) : "--";
-        document.getElementById("water").textContent = d.water_temp != null ? d.water_temp.toFixed(1) : "--";
 
         const heaterEl = document.getElementById("heater");
         if (d.heater != null) {
@@ -34,15 +29,6 @@ async function refresh() {
         } else {
             heaterEl.textContent = "--";
             heaterEl.className = "status-badge status-unknown";
-        }
-
-        const motorEl = document.getElementById("motor");
-        if (d.motor != null) {
-            motorEl.textContent = d.motor ? "ON" : "OFF";
-            motorEl.className = "status-badge " + (d.motor ? "status-on" : "status-off");
-        } else {
-            motorEl.textContent = "--";
-            motorEl.className = "status-badge status-unknown";
         }
 
         // UTC → Costa Rica (UTC-6)
@@ -116,8 +102,8 @@ async function loadHistory() {
             const tr = document.createElement("tr");
             const time = r.timestamp.split(" ")[1] || r.timestamp;
             const temp = r.biodigester_temp != null ? r.biodigester_temp.toFixed(1) : "--";
-            const circ = r.heater != null ? (r.heater ? "ON" : "OFF") : "--";
-            tr.innerHTML = "<td>" + time + "</td><td>" + temp + "</td><td>" + circ + "</td>";
+            const heat = r.heater != null ? (r.heater ? "ON" : "OFF") : "--";
+            tr.innerHTML = "<td>" + time + "</td><td>" + temp + "</td><td>" + heat + "</td>";
             tbody.appendChild(tr);
         });
         const wrap = document.querySelector(".csv-table-wrap");

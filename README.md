@@ -62,7 +62,6 @@ Flask application deployed on Railway.
 | Heater | NORJIN 5-gallon silicone drum heater band, 120 V / 800 W, 200 x 860 mm, built-in thermostat 30–150 °C |
 | Heater control | SSR (40A, zero-cross) via optocoupler module (GPIO25) |
 | Display | 20x4 I2C LCD (PCF8574 backpack) |
-| AC power protection | Plug-in GFCI (enchufable) upstream of the extension cord feeding the SSR/heater |
 
 ### Wiring
 
@@ -82,13 +81,13 @@ GND ────────┬── ESP32 GND
 ESP32 GPIO4  ── DS18B20 DATA
 ESP32 GPIO25 ── Optocoupler PWM → SSR (DC+/DC-)
 
-AC 120V ── GFCI ── SSR ── Drum heater (built-in thermostat in series)
+AC 120V ── SSR ── Drum heater (built-in thermostat in series)
 ```
 
 ### Safety
 
 - The drum heater's built-in thermostat is in series with the SSR and acts as a hardware temperature limit that works even if the firmware hangs or the SSR fails closed. Set the dial only slightly above the control setpoint (the heater surface runs hotter than the slurry), and keep it well below the softening temperature of the tank material
-- The heater is fully covered, so no hot surface is exposed; the GFCI protects against ground faults
+- The heater is fully covered, so no hot surface is exposed
 
 ## Dependencies
 
@@ -120,7 +119,11 @@ Separate the controller into two boards so that the network-connected MCU never 
 
 Replace the current DS18B20 probe (very thin leads, easily broken) with a sturdier waterproof probe.
 
-### 3. Similitude Analysis
+### 3. GFCI (Optional)
+
+A plug-in GFCI (enchufable) may be added upstream of the extension cord feeding the SSR/heater to protect against ground faults, leakage, and shock.
+
+### 4. Similitude Analysis
 
 Buckingham Pi similitude analysis against the full-scale digester may be revisited if needed.
 
